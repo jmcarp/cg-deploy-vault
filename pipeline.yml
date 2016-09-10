@@ -7,7 +7,9 @@ jobs:
     - get: consul-boshrelease
     - get: vault-stemcell
     - get: vault-config
+      trigger: true
     - get: common
+      trigger: true
   - task: vault-manifest
     config:
       platform: linux

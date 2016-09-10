@@ -19,7 +19,7 @@ compilation:
 
 update:
   canaries: 1
-  max_in_flight: 5
+  max_in_flight: 1
   canary_watch_time: 1000-300000
   update_watch_time: 1000-300000
   serial: false
@@ -65,5 +65,10 @@ properties:
   vault:
     backend:
       use_consul: true
+    listener:
+      tcp:
+        tls:
+          certificate: (( param "specify tls cert" ))
+          key: (( param "specify tls key" ))
   consul:
     join_hosts: (( grab jobs.vault.networks.vault.static_ips ))
