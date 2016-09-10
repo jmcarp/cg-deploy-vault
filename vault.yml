@@ -1,0 +1,69 @@
+meta:
+  availability_zone: (( param "specify availability zone" ))
+
+name: vault
+
+director_uuid: (( param "specify director uuid" ))
+
+compilation:
+  network: vault
+  reuse_compilation_vms: true
+  workers: 2
+  cloud_properties:
+    instance_type: m3.medium
+    ephemeral_disk:
+      size: 30000
+      type: gp2
+      encrypted: true
+    availability_zone: (( grab meta.availability_zone ))
+
+update:
+  canaries: 1
+  max_in_flight: 5
+  canary_watch_time: 1000-300000
+  update_watch_time: 1000-300000
+  serial: false
+
+releases:
+- { name: vault, version: latest }
+- { name: consul, version: latest }
+
+jobs:
+- name: vault
+  templates:
+  - { release: vault, name: vault }
+  - { release: consul, name: consul }
+  instances: 3
+  resource_pool: vault
+  persistent_disk_pool: vault
+  networks:
+  - name: vault
+    static_ips: (( static_ips(0, 1, 2) ))
+
+networks:
+- name: vault
+  type: manual
+  subnets: (( param "specify subnets" ))
+
+resource_pools:
+- name: vault
+  stemcell:
+    name: bosh-aws-xen-hvm-ubuntu-trusty-go_agent
+    version: latest
+  cloud_properties:
+    instance_type: m3.medium
+    availability_zone: (( grab meta.availability_zone ))
+
+disk_pools:
+- name: vault
+  disk_size: 30000
+  cloud_properties:
+    type: gp2
+    encrypted: true
+
+properties:
+  vault:
+    backend:
+      use_consul: true
+  consul:
+    join_hosts: (( grab jobs.vault.networks.vault.static_ips ))

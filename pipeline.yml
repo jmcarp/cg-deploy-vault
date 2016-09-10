@@ -1,0 +1,98 @@
+---
+jobs:
+- name: deploy-vault
+  plan:
+  - aggregate:
+    - get: vault-boshrelease
+    - get: consul-boshrelease
+    - get: vault-stemcell
+    - get: vault-config
+    - get: common
+  - task: vault-manifest
+    config:
+      platform: linux
+      image_resource:
+        type: docker-image
+        source:
+          repository: 18fgsa/concourse-task
+      inputs:
+      - name: vault-config
+      - name: common
+      outputs:
+      - name: vault-manifest
+      run:
+        path: sh
+        args:
+        - -exc
+        - spruce merge vault-config/vault.yml common/secrets.yml > vault-manifest/manifest.yml
+  - put: vault-deployment
+    params:
+      cert: common/boshCA.crt
+      manifest: vault-manifest/manifest.yml
+      releases:
+      - vault-boshrelease/*.tgz
+      - consul-boshrelease/*.tgz
+      stemcells:
+      - vault-stemcell/*.tgz
+
+resources:
+- name: vault-boshrelease
+  type: bosh-io-release
+  source:
+    repository: cloudfoundry-community/vault-boshrelease
+
+- name: consul-boshrelease
+  type: bosh-io-release
+  source:
+    repository: cloudfoundry-community/consul-boshrelease
+
+- name: vault-config
+  type: git
+  source:
+    uri: {{cg-deploy-vault-git-url}}
+    branch: {{cg-deploy-vault-git-branch}}
+
+- name: vault-stemcell
+  type: s3
+  source:
+    access_key_id: {{ci-access-key-id}}
+    bucket: cg-stemcell-images
+    regexp: light-bosh-stemcell-(.*)-aws-xen-hvm-ubuntu-trusty-go_agent.tgz
+    region_name: us-gov-west-1
+    secret_access_key: {{ci-secret-access-key}}
+
+- name: common
+  type: cg-common
+  source:
+    region: {{vault-private-region}}
+    bucket_name: {{vault-private-bucket}}
+    access_key_id: {{ci-access-key-id}}
+    secret_access_key: {{ci-secret-access-key}}
+    secrets_file: vault.yml
+    secrets_passphrase: {{vault-private-passphrase}}
+    bosh_cert: bosh.pem
+
+- name: vault-deployment
+  type: 18f-bosh-deployment
+  source:
+    target: {{vault-deployment-bosh-target}}
+    username: {{vault-deployment-bosh-username}}
+    password: {{vault-deployment-bosh-password}}
+    deployment: {{vault-deployment-bosh-deployment}}
+    ignore_ssl: false
+
+resource_types:
+- name: slack-notification
+  type: docker-image
+  source:
+    repository: cfcommunity/slack-notification-resource
+
+- name: 18f-bosh-deployment
+  type: docker-image
+  source:
+    repository: 18fgsa/bosh-deployment-resource
+
+- name: cg-common
+  type: docker-image
+  source:
+    repository: 18fgsa/cg-common-resource
